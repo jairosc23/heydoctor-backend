@@ -3,25 +3,30 @@ import { auth } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// LISTAR citas
+/* --------------------------------------------------
+   GET — OBTENER AGENDA
+-------------------------------------------------- */
 router.get("/", auth, async (req, res) => {
   try {
-    // Aquí luego conectaremos a DB
+    // Más adelante conectaremos a MySQL, PostgreSQL o Mongo
     res.json({
       ok: true,
       agenda: [],
     });
   } catch (error) {
+    console.error("Error en GET /agenda:", error);
     res.status(500).json({ ok: false, msg: "Error en servidor" });
   }
 });
 
-// CREAR nueva cita
+/* --------------------------------------------------
+   POST — CREAR NUEVA CITA
+-------------------------------------------------- */
 router.post("/", auth, async (req, res) => {
   try {
     const { paciente, fecha, hora, motivo } = req.body;
 
-    // Validación básica
+    // Validaciones mínimas
     if (!paciente || !fecha || !hora) {
       return res.status(400).json({
         ok: false,
@@ -29,7 +34,7 @@ router.post("/", auth, async (req, res) => {
       });
     }
 
-    // Aquí más adelante guardamos en BD
+    // Por ahora generamos una cita "fake" hasta conectar BD
     const nuevaCita = {
       id: Date.now(),
       paciente,
@@ -44,6 +49,7 @@ router.post("/", auth, async (req, res) => {
       cita: nuevaCita,
     });
   } catch (error) {
+    console.error("Error en POST /agenda:", error);
     res.status(500).json({ ok: false, msg: "Error creando cita" });
   }
 });
