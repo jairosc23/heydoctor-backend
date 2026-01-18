@@ -7,77 +7,62 @@ import { db } from "./db.js";
 dotenv.config();
 
 const app = express();
-
-// CORS configurado correctamente para Next.js + Producción
-app.use(
-  cors({
-    origin: "*", // puedes restringir luego a tu dominio real
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
-
+app.use(cors());
 app.use(express.json());
 
-// ------------------------------
-// IMPORT ROUTES
-// ------------------------------
+/* ---------------------------------------
+   IMPORTAR RUTAS
+---------------------------------------- */
 import authRouter from "./routes/auth.js";
 import pacientesRouter from "./routes/pacientes.js";
 import agendaRouter from "./routes/agenda.js";
 import configRouter from "./routes/config.js";
-import notificationsRouter from "./routes/notifications.js"; // ← NUEVO
+import cie10Router from "./routes/cie10.js";     // ← NUEVA RUTA CIE-10
+import notificationsRouter from "./routes/notifications.js"; // ← Notificaciones Web Push (si aplica)
 
-// ------------------------------
-// ENABLE ROUTES
-// ------------------------------
+/* ---------------------------------------
+   USAR RUTAS
+---------------------------------------- */
 app.use("/auth", authRouter);
-app.use("/patients", pacientesRouter); // ← Documentos viven aquí
-app.use("/pacientes", pacientesRouter); // compatibilidad anterior
+app.use("/pacientes", pacientesRouter);
 app.use("/agenda", agendaRouter);
 app.use("/config", configRouter);
-app.use("/notifications", notificationsRouter); // ← NUEVO
+app.use("/cie10", cie10Router);                // ← Habilitar búsqueda CIE-10
+app.use("/notifications", notificationsRouter); // ← Web Push
 
-// ------------------------------
-// CREATE ADMIN IF NOT EXISTS
-// ------------------------------
+/* ---------------------------------------
+   CREAR ADMIN AUTOMÁTICO SI NO EXISTE
+---------------------------------------- */
 async function ensureAdmin() {
-  try {
-    const email = process.env.ADMIN_EMAIL;
-    const pass = process.env.ADMIN_PASSWORD;
-    const name = process.env.ADMIN_NAME;
+  const email = process.env.ADMIN_EMAIL;
+  const pass = process.env.ADMIN_PASSWORD;
+  const name = process.env.ADMIN_NAME;
 
-    if (!email || !pass || !name) {
-      console.warn("⚠ Variables ADMIN_* no configuradas en .env");
-      return;
-    }
+  if (!email || !pass || !name) {
+    console.error("❌ ADMIN_EMAIL, ADMIN_PASSWORD o ADMIN_NAME faltan en .env");
+    return;
+  }
 
-    const check = await db.query(
-      "SELECT * FROM users WHERE email=$1 LIMIT 1",
-      [email]
+  const check = await db.query("SELECT * FROM users WHERE email=$1", [email]);
+
+  if (check.rows.length === 0) {
+    const hash = await bcrypt.hash(pass, 10);
+
+    await db.query(
+      "INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,$4)",
+      [name, email, hash, "admin"]
     );
 
-    if (check.rows.length === 0) {
-      const hash = await bcrypt.hash(pass, 10);
-      await db.query(
-        "INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,$4)",
-        [name, email, hash, "admin"]
-      );
-      console.log("✔ Usuario administrador creado");
-    } else {
-      console.log("✔ Admin existente verificado");
-    }
-  } catch (err) {
-    console.error("❌ Error creando admin:", err);
+    console.log("✔ Usuario administrador creado automáticamente");
+  } else {
+    console.log("✔ Admin existente detectado");
   }
 }
 
-// ------------------------------
-// START SERVER
-// ------------------------------
-const PORT = process.env.PORT || 8080;
-
-app.listen(PORT, async () => {
+/* ---------------------------------------
+   SERVIDOR
+---------------------------------------- */
+app.listen(process.env.PORT || 8080, async () => {
   await ensureAdmin();
-  console.log(`🚀 HeyDoctor backend corriendo en puerto ${PORT}`);
+  console.log("🚀 HeyDoctor backend corriendo en puerto:", process.env.PORT || 8080);
 });
