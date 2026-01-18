@@ -7,39 +7,77 @@ import { db } from "./db.js";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// CORS configurado correctamente para Next.js + Producción
+app.use(
+  cors({
+    origin: "*", // puedes restringir luego a tu dominio real
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
 app.use(express.json());
 
-// Import routes
+// ------------------------------
+// IMPORT ROUTES
+// ------------------------------
 import authRouter from "./routes/auth.js";
 import pacientesRouter from "./routes/pacientes.js";
 import agendaRouter from "./routes/agenda.js";
 import configRouter from "./routes/config.js";
+import notificationsRouter from "./routes/notifications.js"; // ← NUEVO
 
+// ------------------------------
+// ENABLE ROUTES
+// ------------------------------
 app.use("/auth", authRouter);
-app.use("/pacientes", pacientesRouter);
+app.use("/patients", pacientesRouter); // ← Documentos viven aquí
+app.use("/pacientes", pacientesRouter); // compatibilidad anterior
 app.use("/agenda", agendaRouter);
 app.use("/config", configRouter);
+app.use("/notifications", notificationsRouter); // ← NUEVO
 
-// Create admin if missing
+// ------------------------------
+// CREATE ADMIN IF NOT EXISTS
+// ------------------------------
 async function ensureAdmin() {
-  const email = process.env.ADMIN_EMAIL;
-  const pass = process.env.ADMIN_PASSWORD;
-  const name = process.env.ADMIN_NAME;
+  try {
+    const email = process.env.ADMIN_EMAIL;
+    const pass = process.env.ADMIN_PASSWORD;
+    const name = process.env.ADMIN_NAME;
 
-  const check = await db.query("SELECT * FROM users WHERE email=$1", [email]);
+    if (!email || !pass || !name) {
+      console.warn("⚠ Variables ADMIN_* no configuradas en .env");
+      return;
+    }
 
-  if (check.rows.length === 0) {
-    const hash = await bcrypt.hash(pass, 10);
-    await db.query(
-      "INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,$4)",
-      [name, email, hash, "admin"]
+    const check = await db.query(
+      "SELECT * FROM users WHERE email=$1 LIMIT 1",
+      [email]
     );
-    console.log("✔ Usuario administrador creado");
+
+    if (check.rows.length === 0) {
+      const hash = await bcrypt.hash(pass, 10);
+      await db.query(
+        "INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,$4)",
+        [name, email, hash, "admin"]
+      );
+      console.log("✔ Usuario administrador creado");
+    } else {
+      console.log("✔ Admin existente verificado");
+    }
+  } catch (err) {
+    console.error("❌ Error creando admin:", err);
   }
 }
 
-app.listen(process.env.PORT || 8080, async () => {
+// ------------------------------
+// START SERVER
+// ------------------------------
+const PORT = process.env.PORT || 8080;
+
+app.listen(PORT, async () => {
   await ensureAdmin();
-  console.log("🚀 HeyDoctor backend corriendo");
+  console.log(`🚀 HeyDoctor backend corriendo en puerto ${PORT}`);
 });
