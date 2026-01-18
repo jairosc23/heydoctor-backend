@@ -56,3 +56,28 @@ router.post("/:id/files", upload.single("file"), async (req, res) => {
 });
 
 export default router;
+// GUARDAR HISTORIA CLÍNICA
+router.post("/:id/history", async (req, res) => {
+  const { subjective, objective, diagnosis, plan } = req.body;
+
+  try {
+    await db.query(
+      `UPDATE patients SET history = 
+        COALESCE(history, '[]'::jsonb) || 
+        jsonb_build_object(
+          'date', NOW(),
+          'subjective', $1,
+          'objective', $2,
+          'diagnosis', $3,
+          'plan', $4
+        )
+      WHERE id = $5`,
+      [subjective, objective, diagnosis, plan, req.params.id]
+    );
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("Error guardando historia:", err);
+    res.status(500).json({ error: "Error interno" });
+  }
+});
