@@ -3,44 +3,102 @@ import { auth } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// Mock temporal en memoria
-let AGENDA = [];
+// 🔹 Simulación temporal de base de datos:
+let AGENDA = [
+  // Ejemplo inicial
+  // {
+  //   id: "1",
+  //   paciente: "Juan Pérez",
+  //   fecha: "2024-12-20",
+  //   hora: "10:00",
+  // },
+];
 
-// GET: listar citas
+// ---------------------------------------------------------------------------
+// 🟦 GET — Obtener todas las citas
+// ---------------------------------------------------------------------------
 router.get("/", auth, async (req, res) => {
-  res.json({ ok: true, agenda: AGENDA });
+  return res.json({
+    ok: true,
+    agenda: AGENDA,
+  });
 });
 
-// POST: crear cita
+// ---------------------------------------------------------------------------
+// 🟩 POST — Crear nueva cita
+// ---------------------------------------------------------------------------
 router.post("/", auth, async (req, res) => {
-  const newCita = {
+  const { paciente, fecha, hora } = req.body;
+
+  if (!paciente || !fecha || !hora) {
+    return res.status(400).json({
+      ok: false,
+      msg: "Todos los campos son obligatorios (paciente, fecha, hora).",
+    });
+  }
+
+  const cita = {
     id: Date.now().toString(),
-    paciente: req.body.paciente,
-    fecha: req.body.fecha,
-    hora: req.body.hora,
-    motivo: req.body.motivo || "",
+    paciente,
+    fecha,
+    hora,
   };
 
-  AGENDA.push(newCita);
+  AGENDA.push(cita);
 
-  res.json({ ok: true, cita: newCita });
+  return res.json({
+    ok: true,
+    msg: "Cita creada correctamente",
+    cita,
+  });
 });
 
-// PUT: editar cita
+// ---------------------------------------------------------------------------
+// 🟨 PUT — Editar una cita existente
+// ---------------------------------------------------------------------------
 router.put("/:id", auth, async (req, res) => {
   const { id } = req.params;
-  const idx = AGENDA.findIndex((c) => c.id === id);
+  const { paciente, fecha, hora } = req.body;
 
-  if (idx === -1) {
+  const index = AGENDA.findIndex((c) => c.id === id);
+
+  if (index === -1) {
     return res.status(404).json({ ok: false, msg: "Cita no encontrada" });
   }
 
-  AGENDA[idx] = {
-    ...AGENDA[idx],
-    ...req.body,
+  AGENDA[index] = {
+    ...AGENDA[index],
+    paciente: paciente ?? AGENDA[index].paciente,
+    fecha: fecha ?? AGENDA[index].fecha,
+    hora: hora ?? AGENDA[index].hora,
   };
 
-  res.json({ ok: true, cita: AGENDA[idx] });
+  return res.json({
+    ok: true,
+    msg: "Cita actualizada",
+    cita: AGENDA[index],
+  });
 });
 
+// ---------------------------------------------------------------------------
+// 🟥 DELETE — Eliminar cita por ID
+// ---------------------------------------------------------------------------
+router.delete("/:id", auth, async (req, res) => {
+  const { id } = req.params;
+
+  const exists = AGENDA.some((c) => c.id === id);
+
+  if (!exists) {
+    return res.status(404).json({ ok: false, msg: "Cita no encontrada" });
+  }
+
+  AGENDA = AGENDA.filter((c) => c.id !== id);
+
+  return res.json({
+    ok: true,
+    msg: "Cita eliminada",
+  });
+});
+
+// EXPORTAR RUTA
 export default router;
