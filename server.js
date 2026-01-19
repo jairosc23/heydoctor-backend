@@ -19,6 +19,8 @@ import agendaRouter from "./routes/agenda.js";
 import configRouter from "./routes/config.js";
 import cie10Router from "./routes/cie10.js";     // ← NUEVA RUTA CIE-10
 import notificationsRouter from "./routes/notifications.js"; // ← Notificaciones Web Push (si aplica)
+import pdfCertificateRouter from "./routes/pdfCertificate.js";
+app.use("/pdf", pdfCertificateRouter);
 
 /* ---------------------------------------
    USAR RUTAS
