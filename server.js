@@ -23,6 +23,8 @@ import pdfCertificateRouter from "./routes/pdfCertificate.js";
 app.use("/pdf", pdfCertificateRouter);
 import pdfPrescriptionRouter from "./routes/pdfPrescription.js";
 app.use("/pdf", pdfPrescriptionRouter);
+import pdfInterconsultRouter from "./routes/pdfInterconsult.js";
+app.use("/pdf", pdfInterconsultRouter);
 
 /* ---------------------------------------
    USAR RUTAS
