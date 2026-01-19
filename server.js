@@ -2,73 +2,104 @@ import express from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+
 import { db } from "./db.js";
 
 dotenv.config();
 
 const app = express();
-app.use(cors());
 app.use(express.json());
 
-/* ---------------------------------------
-   IMPORTAR RUTAS
----------------------------------------- */
+// ----------------------------------------
+// CORS (Seguro para producción)
+// ----------------------------------------
+app.use(
+  cors({
+    origin: "*", // Puedes poner tu dominio final aquí
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  })
+);
+
+// ----------------------------------------
+// SERVIR ARCHIVOS ESTÁTICOS (firmas, sellos, uploads)
+// ----------------------------------------
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Carpeta /public (firma.png, seal.png)
+app.use("/public", express.static(path.join(__dirname, "public")));
+
+// Carpeta /uploads (archivos subidos por pacientes)
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// ----------------------------------------
+// IMPORTAR RUTAS
+// ----------------------------------------
 import authRouter from "./routes/auth.js";
 import pacientesRouter from "./routes/pacientes.js";
 import agendaRouter from "./routes/agenda.js";
 import configRouter from "./routes/config.js";
-import cie10Router from "./routes/cie10.js";     // ← NUEVA RUTA CIE-10
-import notificationsRouter from "./routes/notifications.js"; // ← Notificaciones Web Push (si aplica)
-import pdfCertificateRouter from "./routes/pdfCertificate.js";
-app.use("/pdf", pdfCertificateRouter);
-import pdfPrescriptionRouter from "./routes/pdfPrescription.js";
-app.use("/pdf", pdfPrescriptionRouter);
-import pdfInterconsultRouter from "./routes/pdfInterconsult.js";
-app.use("/pdf", pdfInterconsultRouter);
+import cie10Router from "./routes/cie10.js";
+import notificationsRouter from "./routes/notifications.js";
 
-/* ---------------------------------------
-   USAR RUTAS
----------------------------------------- */
+// PDF GENERATION ROUTES
+import pdfCertificateRouter from "./routes/pdfCertificate.js";
+import pdfPrescriptionRouter from "./routes/pdfPrescription.js";
+import pdfInterconsultRouter from "./routes/pdfInterconsult.js";
+
+// ----------------------------------------
+// USAR RUTAS
+// ----------------------------------------
 app.use("/auth", authRouter);
 app.use("/pacientes", pacientesRouter);
 app.use("/agenda", agendaRouter);
 app.use("/config", configRouter);
-app.use("/cie10", cie10Router);                // ← Habilitar búsqueda CIE-10
-app.use("/notifications", notificationsRouter); // ← Web Push
+app.use("/cie10", cie10Router);
+app.use("/notifications", notificationsRouter);
 
-/* ---------------------------------------
-   CREAR ADMIN AUTOMÁTICO SI NO EXISTE
----------------------------------------- */
+// PDF routes (bien agrupadas bajo /pdf)
+app.use("/pdf/certificate", pdfCertificateRouter);
+app.use("/pdf/prescription", pdfPrescriptionRouter);
+app.use("/pdf/interconsult", pdfInterconsultRouter);
+
+// ----------------------------------------
+// CREAR ADMIN AUTOMÁTICAMENTE SI NO EXISTE
+// ----------------------------------------
 async function ensureAdmin() {
-  const email = process.env.ADMIN_EMAIL;
-  const pass = process.env.ADMIN_PASSWORD;
-  const name = process.env.ADMIN_NAME;
+  const { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME } = process.env;
 
-  if (!email || !pass || !name) {
-    console.error("❌ ADMIN_EMAIL, ADMIN_PASSWORD o ADMIN_NAME faltan en .env");
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD || !ADMIN_NAME) {
+    console.warn("⚠️ Variables ADMIN_* faltan en el archivo .env");
     return;
   }
 
-  const check = await db.query("SELECT * FROM users WHERE email=$1", [email]);
+  const check = await db.query("SELECT * FROM users WHERE email=$1", [
+    ADMIN_EMAIL,
+  ]);
 
   if (check.rows.length === 0) {
-    const hash = await bcrypt.hash(pass, 10);
+    const hash = await bcrypt.hash(ADMIN_PASSWORD, 10);
 
     await db.query(
-      "INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,$4)",
-      [name, email, hash, "admin"]
+      `INSERT INTO users (name, email, password_hash, role)
+       VALUES ($1, $2, $3, $4)`,
+      [ADMIN_NAME, ADMIN_EMAIL, hash, "admin"]
     );
 
-    console.log("✔ Usuario administrador creado automáticamente");
+    console.log("✔ Admin creado automáticamente");
   } else {
-    console.log("✔ Admin existente detectado");
+    console.log("✔ Admin ya existe");
   }
 }
 
-/* ---------------------------------------
-   SERVIDOR
----------------------------------------- */
-app.listen(process.env.PORT || 8080, async () => {
+// ----------------------------------------
+// INICIAR SERVIDOR
+// ----------------------------------------
+const PORT = process.env.PORT || 8080;
+
+app.listen(PORT, async () => {
   await ensureAdmin();
-  console.log("🚀 HeyDoctor backend corriendo en puerto:", process.env.PORT || 8080);
+  console.log(`🚀 HeyDoctor backend corriendo en puerto: ${PORT}`);
 });
