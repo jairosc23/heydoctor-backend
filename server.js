@@ -21,6 +21,8 @@ import cie10Router from "./routes/cie10.js";     // ← NUEVA RUTA CIE-10
 import notificationsRouter from "./routes/notifications.js"; // ← Notificaciones Web Push (si aplica)
 import pdfCertificateRouter from "./routes/pdfCertificate.js";
 app.use("/pdf", pdfCertificateRouter);
+import pdfPrescriptionRouter from "./routes/pdfPrescription.js";
+app.use("/pdf", pdfPrescriptionRouter);
 
 /* ---------------------------------------
    USAR RUTAS
