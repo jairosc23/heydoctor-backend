@@ -1,30 +1,28 @@
 import express from "express";
 import PDFDocument from "pdfkit";
-import fs from "fs";
 import path from "path";
-import QRCode from "qrcode";
+import fs from "fs";
 import { db } from "../db.js";
+import { v4 as uuidv4 } from "uuid";
+import { generateQR } from "../utils/generateQR.js";
 
 const router = express.Router();
 
-/* -------------------------------------------------
-   GENERAR CERTIFICADO MÉDICO PDF
--------------------------------------------------- */
-router.post("/:id", async (req, res) => {
+/* ============================================
+   CERTIFICADO MÉDICO PDF — HEYDOCTOR
+============================================ */
+
+router.get("/certificate/:patientId", async (req, res) => {
   try {
-    const patientId = req.params.id;
-    const { days, reason, recommendations } = req.body;
+    const patientId = req.params.patientId;
 
-    if (!days || !reason) {
-      return res.status(400).json({
-        error: "Debe incluir días de reposo y motivo",
-      });
-    }
-
-    // Obtener datos del paciente
-    const { rows } = await db.query("SELECT * FROM patients WHERE id = $1", [
-      patientId,
-    ]);
+    /* -----------------------------
+       1. OBTENER DATOS DEL PACIENTE
+    ------------------------------ */
+    const { rows } = await db.query(
+      "SELECT * FROM patients WHERE id = $1 LIMIT 1",
+      [patientId]
+    );
 
     if (rows.length === 0) {
       return res.status(404).json({ error: "Paciente no encontrado" });
@@ -32,155 +30,157 @@ router.post("/:id", async (req, res) => {
 
     const patient = rows[0];
 
-    /* Crear archivo PDF */
-    const filename = `certificate-${patientId}-${Date.now()}.pdf`;
-    const outputPath = path.join("public", filename);
+    /* -----------------------------
+       2. CREAR UUID PARA EL DOCUMENTO
+    ------------------------------ */
 
-    const doc = new PDFDocument({
-      size: "A4",
-      margin: 50,
-    });
+    const documentId = uuidv4();
 
-    const stream = fs.createWriteStream(outputPath);
-    doc.pipe(stream);
+    /* -----------------------------
+       3. REGISTRAR DOCUMENTO EN BD
+    ------------------------------ */
 
-    /* -------------------------------------------------
-       ENCABEZADO HEYDOCTOR
-    -------------------------------------------------- */
+    await db.query(
+      `INSERT INTO documents (uuid, type, patient_id, doctor_name, doctor_specialty, doctor_signature_url, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,NOW())`,
+      [
+        documentId,
+        "certificado",
+        patientId,
+        "Dr. Jairo Santana",
+        "Médico y Cirujano",
+        `${process.env.BASE_URL}/public/signature.png`,
+      ]
+    );
+
+    /* -----------------------------
+       4. CREAR PDF
+    ------------------------------ */
+
+    const doc = new PDFDocument({ size: "A4", margin: 50 });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename=certificado-${patientId}.pdf`
+    );
+
+    doc.pipe(res);
+
+    /* -----------------------------
+       5. ENCABEZADO + LOGO
+    ------------------------------ */
+
+    const logoPath = path.resolve("public/logo.png");
+    if (fs.existsSync(logoPath)) doc.image(logoPath, 50, 40, { width: 90 });
+
     doc
-      .fontSize(26)
-      .fillColor("#0d9488")
-      .text("Certificado Médico", { align: "center" })
-      .moveDown();
+      .fontSize(22)
+      .fillColor("#0f766e")
+      .text("HEYDOCTOR", 150, 50);
 
     doc
-      .fontSize(12)
-      .fillColor("#333")
-      .text("Centro Médico HeyDoctor", { align: "center" })
-      .text("Dr. Jairo Santana — Médico y Cirujano", { align: "center" })
-      .text("Registro Profesional: 202404 | Chile", { align: "center" })
-      .moveDown(2);
+      .fontSize(11)
+      .fillColor("#444")
+      .text("Plataforma de Telemedicina con Certificación Digital", 150, 75);
 
-    /* -------------------------------------------------
-       DATOS DEL PACIENTE
-    -------------------------------------------------- */
+    doc.moveDown(3);
+
+    /* -----------------------------
+       6. TÍTULO DEL DOCUMENTO
+    ------------------------------ */
+
     doc
-      .fontSize(14)
-      .fillColor("#0d9488")
-      .text("Datos del Paciente", { underline: true });
+      .fontSize(20)
+      .fillColor("#000")
+      .text("CERTIFICADO MÉDICO", { align: "center" });
+
+    doc.moveDown(2);
+
+    /* -----------------------------
+       7. CUERPO DEL CERTIFICADO
+    ------------------------------ */
 
     doc
       .fontSize(12)
       .fillColor("#000")
-      .moveDown(0.5)
-      .text(`Nombre: ${patient.name}`)
-      .text(`ID/RUT: ${patient.rut || "—"}`)
-      .text(`Fecha de nacimiento: ${patient.birthdate || "—"}`)
-      .moveDown(1.5);
-
-    /* -------------------------------------------------
-       CONTENIDO DEL CERTIFICADO
-    -------------------------------------------------- */
-    doc
-      .fontSize(14)
-      .fillColor("#0d9488")
-      .text("Motivo del Certificado", { underline: true })
-      .moveDown(0.5);
-
-    doc.fontSize(12).fillColor("#000").text(reason).moveDown(1.5);
-
-    doc
-      .fontSize(14)
-      .fillColor("#0d9488")
-      .text("Días de reposo indicados", { underline: true })
-      .moveDown(0.5);
-
-    doc
-      .fontSize(12)
-      .fillColor("#000")
-      .text(`El paciente requiere ${days} días de reposo médico.`)
-      .moveDown(1.5);
-
-    if (recommendations) {
-      doc
-        .fontSize(14)
-        .fillColor("#0d9488")
-        .text("Recomendaciones", { underline: true })
-        .moveDown(0.5);
-
-      doc.fontSize(12).fillColor("#000").text(recommendations).moveDown(1.5);
-    }
-
-    /* -------------------------------------------------
-       ADVERTENCIA LEGAL
-    -------------------------------------------------- */
-    doc
-      .fontSize(10)
-      .fillColor("#b91c1c")
       .text(
-        "⚠ La falsificación o modificación de certificados médicos constituye delito sancionado por la ley.",
-        { align: "justify" }
-      )
-      .moveDown(2);
+        `El(la) paciente: ${patient.name} (RUT: ${patient.rut || "N/A"})`,
+        50,
+        doc.y
+      );
 
-    /* -------------------------------------------------
-       FIRMA DIGITAL Y SELLO
-    -------------------------------------------------- */
-    const signaturePath = path.resolve("public", "signature.png");
-    const sealPath = path.resolve("public", "seal.png");
+    doc.text(
+      `Se encuentra actualmente en evaluación médica y requiere reposo según criterio clínico.`,
+      50,
+      doc.y + 15
+    );
+
+    doc.text(
+      `Este certificado es generado y firmado digitalmente por el profesional tratante.`,
+      50,
+      doc.y + 15
+    );
+
+    doc.moveDown(3);
+
+    /* -----------------------------
+       8. FIRMA DEL MÉDICO
+    ------------------------------ */
+
+    const signaturePath = path.resolve("public/signature.png");
 
     if (fs.existsSync(signaturePath)) {
-      doc.image(signaturePath, 50, doc.y, { width: 180 });
+      doc.image(signaturePath, 50, doc.y, { width: 160 });
     }
 
-    if (fs.existsSync(sealPath)) {
-      doc.image(sealPath, 360, doc.y - 30, { width: 120 });
-    }
-
-    doc.moveDown(4);
+    doc.moveDown(3);
 
     doc
       .fontSize(12)
-      .fillColor("#000")
-      .text("__________________________", 50)
       .text("Dr. Jairo Santana", 50)
-      .text("Médico y Cirujano — Reg. 202404", 50)
-      .moveDown(2);
+      .text("Médico y Cirujano", 50)
+      .text("Registro: XXXXXXX", 50)
+      .text("HeyDoctor Health", 50);
 
-    /* -------------------------------------------------
-       QR DE VERIFICACIÓN
-    -------------------------------------------------- */
-    const verifyUrl = `${process.env.BASE_URL}/verify/certificate/${patientId}`;
-    const qrCode = await QRCode.toDataURL(verifyUrl);
-    const base64 = qrCode.replace(/^data:image\/png;base64,/, "");
-    const qrPath = path.join("public", `qr-${Date.now()}.png`);
+    doc.moveDown(2);
 
-    fs.writeFileSync(qrPath, Buffer.from(base64, "base64"));
-    doc.image(qrPath, 430, doc.y, { width: 120 });
+    /* -----------------------------
+       9. SELLO PROFESIONAL
+    ------------------------------ */
 
-    /* -------------------------------------------------
-       PIE DE PÁGINA
-    -------------------------------------------------- */
+    const sealPath = path.resolve("public/seal.png");
+    if (fs.existsSync(sealPath)) {
+      doc.image(sealPath, 340, doc.y - 90, { width: 120, opacity: 0.9 });
+    }
+
+    /* -----------------------------
+       10. GENERAR QR DE VERIFICACIÓN
+    ------------------------------ */
+
+    const verifyUrl = `${process.env.FRONTEND_URL}/verify/${documentId}`;
+    const qrImage = await generateQR(verifyUrl);
+
+    doc.image(qrImage, 430, 60, { width: 120 });
+
+    /* -----------------------------
+       11. CODIGOS DE VERIFICACIÓN
+    ------------------------------ */
+
     doc
       .fontSize(10)
-      .fillColor("#666")
-      .text("Emitido electrónicamente por HeyDoctor™", {
-        align: "center",
-      })
-      .text("Documento válido sin firma manuscrita", { align: "center" })
-      .text(new Date().toLocaleString("es-CL"), { align: "center" });
+      .fillColor("#555")
+      .text(`Documento ID: ${documentId}`, 50, 760)
+      .text(`Verificar autenticidad en: ${verifyUrl}`, 50, 775);
+
+    /* -----------------------------
+       12. FINALIZAR PDF
+    ------------------------------ */
 
     doc.end();
-
-    stream.on("finish", () => {
-      res.json({
-        ok: true,
-        url: `${process.env.BASE_URL}/public/${filename}`,
-      });
-    });
-  } catch (error) {
-    console.error("❌ Error generando certificado:", error);
-    res.status(500).json({ error: "Error generando PDF" });
+  } catch (err) {
+    console.error("Error en PDF:", err);
+    res.status(500).json({ error: "Error generando certificado" });
   }
 });
 
