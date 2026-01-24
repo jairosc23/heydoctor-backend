@@ -3,24 +3,24 @@ import webpush from "web-push";
 
 const router = express.Router();
 
-// =============================
-//   Almacén temporal en memoria
-//   (en producción → PostgreSQL)
-// =============================
+// ===================================================
+//  TEMPORAL: LISTA EN MEMORIA
+//  (Producción: almacenar en PostgreSQL tabla notifications_subscriptions)
+// ===================================================
 let subscriptions = [];
 
-// =============================
-//      CONFIGURACIÓN VAPID
-// =============================
+// ===================================================
+//  CONFIGURACIÓN VAPID (WebPush nativo)
+// ===================================================
 webpush.setVapidDetails(
   "mailto:admin@heydoctor.health",
   process.env.VAPID_PUBLIC,
   process.env.VAPID_PRIVATE
 );
 
-// =============================
-//   REGISTRAR SUSCRIPCIÓN
-// =============================
+// ===================================================
+//  REGISTRAR SUSCRIPCIÓN DEL CLIENTE
+// ===================================================
 router.post("/subscribe", async (req, res) => {
   try {
     const sub = req.body;
@@ -30,54 +30,60 @@ router.post("/subscribe", async (req, res) => {
     }
 
     // Evitar duplicados
-    const exists = subscriptions.find((s) => s.endpoint === sub.endpoint);
+    const exists = subscriptions.some((s) => s.endpoint === sub.endpoint);
+
     if (!exists) {
       subscriptions.push(sub);
-      console.log("🔔 Nueva suscripción:", sub.endpoint);
+      console.log("🔔 Nueva suscripción registrada:", sub.endpoint);
     }
 
     res.json({ ok: true });
   } catch (err) {
     console.error("❌ Error registrando suscripción:", err);
-    res.status(500).json({ error: "Error interno" });
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 });
 
-// =============================
-//   ENVIAR NOTIFICACIÓN
-// =============================
+// ===================================================
+//  ENVIAR NOTIFICACIÓN A TODAS LAS SUSCRIPCIONES
+// ===================================================
 router.post("/send", async (req, res) => {
   const { title, body, url } = req.body;
 
-  console.log("📨 Enviando notificaciones… Total:", subscriptions.length);
+  if (!title || !body) {
+    return res.status(400).json({ error: "Título y cuerpo son requeridos" });
+  }
 
-  let activeSubscriptions = [];
+  console.log(`🚀 Enviando notificaciones… Total suscritos: ${subscriptions.length}`);
+
+  let active = [];
 
   for (const sub of subscriptions) {
     try {
-      await webpush.sendNotification(
-        sub,
-        JSON.stringify({ title, body, url })
-      );
+      await webpush.sendNotification(sub, JSON.stringify({ title, body, url }));
 
-      activeSubscriptions.push(sub); // sigue siendo válida
+      active.push(sub); // Sigue activa
 
     } catch (error) {
       console.error("⚠️ Error enviando a:", sub.endpoint);
 
       // Suscripción expirada → eliminar
-      if (error.statusCode === 410 || error.statusCode === 404) {
-        console.log("🗑 Eliminando suscripción expirada");
+      if (error.statusCode === 404 || error.statusCode === 410) {
+        console.log("🗑 Eliminando suscripción expirada:", sub.endpoint);
       } else {
-        console.error("❌ Error WebPush:", error);
+        console.error("⚠️ Error WebPush:", error.message || error);
       }
     }
   }
 
-  // Actualizar lista sin las suscripciones inválidas
-  subscriptions = activeSubscriptions;
+  // Mantener solo suscripciones funcionando
+  subscriptions = active;
 
-  res.json({ ok: true, sent: activeSubscriptions.length });
+  res.json({
+    ok: true,
+    total_sent: active.length,
+    removed: active.length - subscriptions.length,
+  });
 });
 
 export default router;
