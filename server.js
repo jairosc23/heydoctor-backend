@@ -17,13 +17,13 @@ app.use(express.json());
 // ----------------------------------------
 app.use(
   cors({
-    origin: "*", // Puedes poner tu dominio final aquí
+    origin: "*", // Cambiar a dominio final en producción
     methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
 
 // ----------------------------------------
-// SERVIR ARCHIVOS ESTÁTICOS (firmas, sellos, uploads)
+// SERVIR ARCHIVOS ESTÁTICOS
 // ----------------------------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,7 +31,7 @@ const __dirname = path.dirname(__filename);
 // Carpeta /public (firma.png, seal.png)
 app.use("/public", express.static(path.join(__dirname, "public")));
 
-// Carpeta /uploads (archivos subidos por pacientes)
+// Carpeta /uploads (archivos subidos por usuarios)
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ----------------------------------------
@@ -44,10 +44,13 @@ import configRouter from "./routes/config.js";
 import cie10Router from "./routes/cie10.js";
 import notificationsRouter from "./routes/notifications.js";
 
-// PDF GENERATION ROUTES
+// PDF ROUTES
 import pdfCertificateRouter from "./routes/pdfCertificate.js";
 import pdfPrescriptionRouter from "./routes/pdfPrescription.js";
 import pdfInterconsultRouter from "./routes/pdfInterconsult.js";
+
+// ⭐ NUEVA RUTA: AUDITORÍA
+import auditoriaRoutes from "./routes/auditoria.js";
 
 // ----------------------------------------
 // USAR RUTAS
@@ -59,10 +62,13 @@ app.use("/config", configRouter);
 app.use("/cie10", cie10Router);
 app.use("/notifications", notificationsRouter);
 
-// PDF routes (bien agrupadas bajo /pdf)
+// PDF (agrupadas bajo /pdf/)
 app.use("/pdf/certificate", pdfCertificateRouter);
 app.use("/pdf/prescription", pdfPrescriptionRouter);
 app.use("/pdf/interconsult", pdfInterconsultRouter);
+
+// ⭐ RUTA AUDITORÍA
+app.use("/auditoria", auditoriaRoutes);
 
 // ----------------------------------------
 // CREAR ADMIN AUTOMÁTICAMENTE SI NO EXISTE
