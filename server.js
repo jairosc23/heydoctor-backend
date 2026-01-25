@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import { db } from "./db.js";
 
 dotenv.config();
+console.log("ONESIGNAL APP ID:", process.env.ONESIGNAL_APP_ID);
 
 const app = express();
 app.use(express.json());
