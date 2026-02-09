@@ -1,4 +1,4 @@
-import db from "../db/index.js";
+import { db } from "../db.js";
 import sendNotification from "../utils/onesignal.js";
 
 export const listar = async (req, res) => {

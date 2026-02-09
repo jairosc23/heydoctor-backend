@@ -1,0 +1,29 @@
+# Dependencies (Railway/Nixpacks instala en el build; package-lock.json se usa en npm ci)
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Entorno local (nunca subir a imagen)
+.env
+.env.*
+!.env.example
+
+# Git y IDE
+.git/
+.gitignore
+.cursor/
+*.md
+!README.md
+
+# Tests y desarrollo
+*.test.js
+*.spec.js
+__tests__/
+coverage/
+.nyc_output/
+
+# Logs y temporales
+logs/
+*.log
+tmp/
+temp/

@@ -12,11 +12,13 @@ let subscriptions = [];
 // ===================================================
 //  CONFIGURACIÓN VAPID (WebPush nativo)
 // ===================================================
-webpush.setVapidDetails(
-  "mailto:admin@heydoctor.health",
-  process.env.VAPID_PUBLIC,
-  process.env.VAPID_PRIVATE
-);
+if (process.env.VAPID_PUBLIC && process.env.VAPID_PRIVATE) {
+  webpush.setVapidDetails(
+    "mailto:admin@heydoctor.health",
+    process.env.VAPID_PUBLIC,
+    process.env.VAPID_PRIVATE
+  );
+}
 
 // ===================================================
 //  REGISTRAR SUSCRIPCIÓN DEL CLIENTE

@@ -6,8 +6,12 @@ export function auth(req, res, next) {
   if (!token)
     return res.status(401).json({ error: "Token requerido" });
 
+  const secret = process.env.JWT_SECRET;
+  if (!secret)
+    return res.status(503).json({ error: "Servicio no configurado (JWT_SECRET)" });
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, secret);
     req.user = decoded;
     next();
   } catch (err) {

@@ -104,7 +104,7 @@ router.get("/patients/:id/history/pdf", async (req, res) => {
     doc.end();
   } catch (err) {
     console.error("Error generando PDF:", err);
-    res.status(500).send("Error generando PDF");
+    res.status(500).type("json").json({ error: "Error generando PDF" });
   }
 });
 
