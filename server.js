@@ -169,15 +169,13 @@ if (process.env.NODE_ENV === "production") {
 // =========================
 // INICIAR SERVIDOR
 // =========================
-app.listen(PORT, async () => {
+app.listen(PORT, "0.0.0.0", async () => {
   try {
     await ensureUsersTable();
     await ensureAdmin();
   } catch (err) {
-    console.warn("⚠ Startup:", err.message);
+    console.warn("⚠️ Startup:", err.message);
   }
-
-  console.log(`🚀 HeyDoctor backend corriendo en puerto ${PORT}`);
+  console.log(`🚀 HeyDoctor backend corriendo en puerto: ${PORT}`);
 });
 
-export { app };
