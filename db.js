@@ -20,14 +20,6 @@ if (!/^postgres(ql)?:\/\//i.test(connectionString)) {
   );
 }
 
-try {
-  new URL(connectionString);
-} catch (e) {
-  throw new Error(
-    `❌ DATABASE_URL tiene formato inválido: ${e.message}. Revisa la variable en Railway.`
-  );
-}
-
 export const db = new pg.Pool({
   connectionString,
   ssl: { rejectUnauthorized: false },
