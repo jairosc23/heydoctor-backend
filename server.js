@@ -177,13 +177,22 @@ if (process.env.NODE_ENV === "production") {
 // =========================
 // INICIAR SERVIDOR
 // =========================
-app.listen(PORT, "0.0.0.0", async () => {
+const server = app.listen(PORT, "0.0.0.0", async () => {
   console.log("🚀 Backend iniciando...");
 
-  await ensureUsersTable();
-  await ensureAdmin();
+  try {
+    await ensureUsersTable();
+    await ensureAdmin();
+  } catch (err) {
+    console.error("⚠️ Error en startup:", err.message);
+  }
 
   console.log(`🚀 HeyDoctor backend corriendo en puerto: ${PORT}`);
+});
+
+// Manejar errores del servidor
+server.on("error", (err) => {
+  console.error("❌ Error del servidor:", err);
 });
 
 export default app;
