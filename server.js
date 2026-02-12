@@ -12,7 +12,7 @@ const app = express();
 app.use(express.json());
 
 // =========================
-// CORS (ajustar dominio final)
+// CORS
 // =========================
 app.use(
   cors({
@@ -31,13 +31,13 @@ app.use("/public", express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // =========================
-// RUTAS
+// IMPORTAR RUTAS
 // =========================
 import authRouter from "./routes/auth.js";
 import pacientesRouter from "./routes/pacientes.js";
 import agendaRouter from "./routes/agenda.js";
 import configRouter from "./routes/config.js";
-// import cie10Router from "./routes/cie.10.js";  // deshabilitada
+// import cie10Router from "./routes/cie.10.js";
 
 import notificationsRouter from "./routes/notifications.js";
 import onesignalRoutes from "./routes/onesignal.js";
@@ -55,6 +55,7 @@ app.use("/auth", authRouter);
 app.use("/pacientes", pacientesRouter);
 app.use("/agenda", agendaRouter);
 app.use("/config", configRouter);
+// app.use("/cie10", cie10Router);
 
 app.use("/notifications", notificationsRouter);
 app.use("/notifications/push", onesignalRoutes);
@@ -134,7 +135,9 @@ async function ensureAdmin() {
   }
 
   try {
-    const result = await db.query("SELECT * FROM users WHERE email=$1", [ADMIN_EMAIL]);
+    const result = await db.query("SELECT * FROM users WHERE email=$1", [
+      ADMIN_EMAIL,
+    ]);
 
     if (result.rows.length === 0) {
       const hash = await bcrypt.hash(ADMIN_PASSWORD, 10);
@@ -155,7 +158,6 @@ async function ensureAdmin() {
 }
 
 // =========================
-—
 // PRODUCCIÓN
 // =========================
 const PORT = process.env.PORT || 8080;
